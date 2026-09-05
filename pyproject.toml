@@ -24,6 +24,20 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 strict_optional = true
 
+# Local ./mlflow/ directory shadows the real mlflow package.
+# Skip it so mypy does not treat the empty namespace as the real library.
+[[tool.mypy.overrides]]
+module = "mlflow"
+ignore_missing_imports = true
+follow_imports = "skip"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "mlflow.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+ignore_errors = true
+
 # ── coverage ──────────────────────────────────────────────────────────────────
 [tool.coverage.run]
 source = ["src"]

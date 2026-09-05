@@ -182,7 +182,7 @@ def load_config(config_path: str = "config/config.yaml") -> dict:
         return yaml.safe_load(f) or {}
 
 
-def generate_tabular_data(config: dict = None) -> pd.DataFrame:
+def generate_tabular_data(config: dict | None = None) -> pd.DataFrame:
     config = config or {}
     gen = config.get("generation", {})
     drift = config.get("drift", {})
