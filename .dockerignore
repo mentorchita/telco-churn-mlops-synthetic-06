@@ -1,0 +1,61 @@
+# ── .dockerignore ────────────────────────────────────────────────────────────
+# Slide 13: cuts build context from GB to MB.
+# Without this, Docker copies .git, data/, notebooks into the build context
+# and adds hundreds of MB even before the first COPY line runs.
+
+# Version control
+.git/
+.gitignore
+.dvc/
+*.dvc
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Development / notebooks
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
+# Data files — model is loaded from MLflow, not baked into image
+data/
+*.csv
+*.parquet
+*.pkl
+*.joblib
+models/
+
+# Tests (not needed in prod image)
+tests/
+conftest.py
+pytest.ini
+.coverage
+htmlcov/
+
+# Docs / CI config
+docs/
+*.md
+.github/
+.gitlab-ci.yml
+
+# IDE / OS
+.idea/
+.vscode/
+*.DS_Store
+.env
+.env.*
+
+# Airflow / other tooling
+airflow/
+conf/
+config/
+mlruns/

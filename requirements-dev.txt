@@ -1,0 +1,27 @@
+# ── Development / CI dependencies ────────────────────────────────────────────
+# NOT installed in the Docker production image (Stage 2).
+# Used by GitHub Actions lint-and-test job (slide 11).
+
+-r requirements.txt
+
+# Code quality (slide 11: flake8, black, mypy)
+flake8==7.0.0
+flake8-bugbear==24.2.6
+black==24.4.2
+mypy==1.10.0
+types-requests==2.31.0.20240406
+
+# Testing
+pytest==8.2.0
+pytest-cov==5.0.0
+pytest-asyncio==0.23.7
+
+# Data validation (slide 11: pandera)
+pandera==0.19.3
+
+# Load testing (slide 28: Prompt 5)
+locust==2.28.0
+
+# Drift detection (slide 28: Prompt 6)
+evidently==0.4.30
+scipy==1.13.0

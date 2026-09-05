@@ -1,0 +1,73 @@
+# .github/workflows/drift-check.yml
+#
+# Scheduled data drift detection — runs daily at 03:00 UTC.
+# Corresponds to Prompt 6 on slide 28.
+#
+# This workflow has NO code-push trigger because drift happens in production
+# data without any code change.  Use workflow_dispatch to test manually first.
+#
+# Secrets required:
+#   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY   (for S3 prediction logs)
+#   MLFLOW_TRACKING_URI
+#   SLACK_WEBHOOK
+
+name: Daily Drift Detection
+
+on:
+  schedule:
+    - cron: "0 3 * * *"     # 03:00 UTC daily
+  workflow_dispatch:          # manual trigger for testing
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  drift-detection:
+    name: "Data Drift Detection"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run drift detection tests
+        run: |
+          pytest tests/unit/test_drift.py -v --tb=short \
+            --junitxml=test-results/drift.xml
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          DRIFT_THRESHOLD:       "0.30"   # fraction of features allowed to drift
+          PSI_THRESHOLD:         "0.10"
+        continue-on-error: true    # capture result before notifying Slack
+
+      - name: Upload Evidently drift report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drift-report-${{ github.run_id }}
+          path: |
+            drift_report.html
+            test-results/drift.xml
+          retention-days: 30
+
+      - name: Slack notification on drift detected
+        if: failure()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "⚠️ *Data drift detected* in Telco Churn model!\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\nDownload drift report from the artifacts above."
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

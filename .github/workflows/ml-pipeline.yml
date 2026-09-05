@@ -1,0 +1,258 @@
+# .github/workflows/ml-pipeline.yml
+#
+# Full CI/CD Pipeline for Telco Churn MLOps
+# Matches the pipeline diagram on slide 5 of Module 6.
+#
+# Stages:
+#   lint-and-test   → quality gate (flake8, mypy, pytest, pandera)
+#   build-and-push  → multi-stage Docker build, push to GHCR
+#   deploy-staging  → docker run on staging VM, smoke test
+#   integration-tests → API contract, model behaviour, latency SLA
+#   deploy-prod     → manual approval required, docker run on prod VM
+#
+# Secrets required (Settings → Secrets → Actions):
+#   GHCR_TOKEN             GitHub PAT with write:packages scope
+#   STAGING_HOST           staging server hostname or IP
+#   STAGING_SSH_KEY        private SSH key for staging server
+#   PROD_HOST              production server hostname
+#   PROD_SSH_KEY           private SSH key for production
+#   MLFLOW_TRACKING_URI    MLflow server URL
+#   SLACK_WEBHOOK          Slack incoming webhook URL
+
+name: Telco Churn ML Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"     # daily model quality check (slide 7: schedule trigger)
+  workflow_dispatch:          # manual trigger — emergency deploy or rollback
+
+env:
+  REGISTRY:  ghcr.io
+  IMAGE:     ghcr.io/${{ github.repository }}/churn-api
+  MLFLOW_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  PYTHON_VERSION: "3.11"
+
+# ── JOB 1: Lint & Test ───────────────────────────────────────────────────────
+jobs:
+  lint-and-test:
+    name: "Lint & Test (quality gate)"
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"                          # slide 24: pip caching saves 4 min
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      # ── Code style ──────────────────────────────────────────────────────────
+      - name: flake8 — code style
+        run: flake8 src/ tests/ --max-line-length 100 --extend-ignore=E203
+
+      - name: black — formatting check
+        run: black --check src/ tests/
+
+      - name: mypy — type checking
+        run: mypy src/ --ignore-missing-imports
+
+      # ── Schema validation FIRST (slide 27: Pandera runs before training) ────
+      - name: pandera — data schema validation
+        run: pytest tests/unit/test_schema.py -v --tb=short
+
+      # ── Unit tests (no model training) ──────────────────────────────────────
+      - name: pytest — unit tests (features + utilities)
+        run: |
+          pytest tests/unit/test_features.py \
+            -v --tb=short \
+            --cov=src/features \
+            --cov-report=xml:coverage-features.xml
+
+      # ── Model quality gate (slide 11: pytest model, 2-5 min) ────────────────
+      - name: pytest — model quality gate
+        run: |
+          pytest tests/unit/test_model.py \
+            -v --tb=short -m slow \
+            --cov=src/models \
+            --cov-report=xml:coverage-models.xml
+        env:
+          MLFLOW_TRACKING_URI: ${{ env.MLFLOW_URI }}
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: coverage-features.xml,coverage-models.xml
+          fail_ci_if_error: false
+
+  # ── JOB 2: Build & Push Docker ───────────────────────────────────────────────
+  build-and-push:
+    name: "Build & Push Docker image"
+    needs: lint-and-test          # slide 8: fail fast — only build if tests pass
+    runs-on: ubuntu-latest
+    # Only build on pushes, not on PRs (saves build minutes)
+    if: github.event_name != 'pull_request'
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-sha: ${{ steps.meta.outputs.version }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      # Docker metadata generates tags automatically (slide 14)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,prefix=sha-                    # git SHA — ALWAYS (source of truth)
+            type=ref,event=branch                   # branch name — ALWAYS
+            type=semver,pattern={{version}}          # semver tag on release
+
+      # BuildKit with layer caching (slide 24: saves 7-10 min)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ── JOB 3: Deploy to Staging ──────────────────────────────────────────────
+  deploy-staging:
+    name: "Deploy to Staging"
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging          # isolated secrets for staging (slide 23)
+
+    steps:
+      - name: Deploy image to staging via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.STAGING_HOST }}
+          username: deploy
+          key:      ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
+            docker stop churn-api || true
+            docker rm   churn-api || true
+            docker run -d \
+              --name churn-api \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e MODEL_URI=${{ secrets.MLFLOW_URI }} \
+              -e MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
+              ${{ env.IMAGE }}:sha-${{ github.sha }}
+            # Wait for container health (slide 15: cold start < 30 s)
+            sleep 20
+            curl -f http://localhost:8000/health || exit 1
+
+  # ── JOB 4: Integration Tests ─────────────────────────────────────────────
+  integration-tests:
+    name: "Integration Tests (L1-L3)"
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+
+      # Smoke test first (slide 15: 30-second check)
+      - name: Smoke test
+        run: |
+          pytest tests/smoke/ -v --tb=short
+        env:
+          API_URL: http://${{ secrets.STAGING_HOST }}:8000
+
+      # Full integration tests (slide 17: L1-L3)
+      - name: Integration tests
+        run: |
+          pytest tests/integration/ -v --tb=short \
+            --junitxml=test-results/integration.xml
+        env:
+          API_URL: http://${{ secrets.STAGING_HOST }}:8000
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-test-results
+          path: test-results/
+
+  # ── JOB 5: Deploy to Production ──────────────────────────────────────────
+  deploy-production:
+    name: "Deploy to Production (manual gate)"
+    needs: integration-tests
+    runs-on: ubuntu-latest
+    # Production environment requires reviewer approval (slide 18 / slide 23)
+    environment:
+      name: production
+      url: https://churn-api.example.com
+    # Only deploy to production from main branch, not develop
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to production via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.PROD_HOST }}
+          username: deploy
+          key:      ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
+            docker stop churn-api || true
+            docker rm   churn-api || true
+            docker run -d \
+              --name churn-api \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e MODEL_URI=${{ secrets.MLFLOW_URI }} \
+              -e MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
+              ${{ env.IMAGE }}:sha-${{ github.sha }}
+            sleep 20
+            curl -f http://localhost:8000/health || exit 1
+
+      - name: Post deployment Slack notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} Production deploy ${{ job.status }}: `sha-${{ github.sha }}`\nActor: ${{ github.actor }}\nBranch: ${{ github.ref_name }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
