@@ -26,12 +26,13 @@ from src.features.build_features import get_X_y
 MIN_AUC = 0.82
 MIN_F1 = 0.70
 MIN_PRECISION = 0.75
-EXPECTED_FEATURE_COUNT = 19   # slide 12: "Feature count = 19"
+EXPECTED_FEATURE_COUNT = 19  # slide 12: "Feature count = 19"
 
 DATA_PATH = "data/raw/telco_train.csv"
 
 
 # ── Module-scoped fixture: train model ONCE ───────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def trained_model_artifacts():
@@ -64,17 +65,18 @@ def trained_model_artifacts():
     dummy.fit(X_train, y_train)
 
     return {
-        "model":    model,
-        "dummy":    dummy,
-        "X_train":  X_train,
-        "X_test":   X_test,
-        "y_train":  y_train,
-        "y_test":   y_test,
+        "model": model,
+        "dummy": dummy,
+        "X_train": X_train,
+        "X_test": X_test,
+        "y_train": y_train,
+        "y_test": y_test,
         "n_features": X.shape[1],
     }
 
 
 # ── Quality gate tests ────────────────────────────────────────────────────────
+
 
 @pytest.mark.slow
 class TestModelQualityGate:
@@ -107,26 +109,19 @@ class TestModelQualityGate:
     def test_beats_dummy_classifier_auc(self, trained_model_artifacts):
         """Model must outperform DummyClassifier — sanity check (slide 12)."""
         art = trained_model_artifacts
-        model_auc = roc_auc_score(
-            art["y_test"],
-            art["model"].predict_proba(art["X_test"])[:, 1]
-        )
-        dummy_auc = roc_auc_score(
-            art["y_test"],
-            art["dummy"].predict_proba(art["X_test"])[:, 1]
-        )
-        assert model_auc > dummy_auc, (
-            f"Model AUC {model_auc:.3f} does not beat DummyClassifier {dummy_auc:.3f}"
-        )
+        model_auc = roc_auc_score(art["y_test"], art["model"].predict_proba(art["X_test"])[:, 1])
+        dummy_auc = roc_auc_score(art["y_test"], art["dummy"].predict_proba(art["X_test"])[:, 1])
+        assert (
+            model_auc > dummy_auc
+        ), f"Model AUC {model_auc:.3f} does not beat DummyClassifier {dummy_auc:.3f}"
 
     def test_beats_dummy_classifier_f1(self, trained_model_artifacts):
         art = trained_model_artifacts
         model_f1 = f1_score(art["y_test"], art["model"].predict(art["X_test"]))
-        dummy_f1 = f1_score(art["y_test"], art["dummy"].predict(art["X_test"]),
-                            zero_division=0)
-        assert model_f1 > dummy_f1, (
-            f"Model F1 {model_f1:.3f} does not beat DummyClassifier {dummy_f1:.3f}"
-        )
+        dummy_f1 = f1_score(art["y_test"], art["dummy"].predict(art["X_test"]), zero_division=0)
+        assert (
+            model_f1 > dummy_f1
+        ), f"Model F1 {model_f1:.3f} does not beat DummyClassifier {dummy_f1:.3f}"
 
     def test_predict_proba_in_range(self, trained_model_artifacts):
         """All probabilities must be in [0, 1] (slide 17 L2 check)."""

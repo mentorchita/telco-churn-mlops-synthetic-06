@@ -247,24 +247,12 @@ def generate_tabular_data(config: dict = None) -> pd.DataFrame:
             ) = secs
         else:
             base_yes = 0.5 + streaming_boost
-            online_security = (
-                "Yes" if random.random() < (base_yes * 0.7) else "No"
-            )
-            online_backup = (
-                "Yes" if random.random() < (base_yes * 0.8) else "No"
-            )
-            device_protection = (
-                "Yes" if random.random() < (base_yes * 0.75) else "No"
-            )
-            tech_support = (
-                "Yes" if random.random() < (base_yes * 0.6) else "No"
-            )
-            streaming_tv = (
-                "Yes" if random.random() < (base_yes + 0.1) else "No"
-            )
-            streaming_movies = (
-                "Yes" if random.random() < (base_yes + 0.1) else "No"
-            )
+            online_security = "Yes" if random.random() < (base_yes * 0.7) else "No"
+            online_backup = "Yes" if random.random() < (base_yes * 0.8) else "No"
+            device_protection = "Yes" if random.random() < (base_yes * 0.75) else "No"
+            tech_support = "Yes" if random.random() < (base_yes * 0.6) else "No"
+            streaming_tv = "Yes" if random.random() < (base_yes + 0.1) else "No"
+            streaming_movies = "Yes" if random.random() < (base_yes + 0.1) else "No"
 
         multiple_lines = (
             "No phone service"
@@ -277,9 +265,7 @@ def generate_tabular_data(config: dict = None) -> pd.DataFrame:
             weights=[m2m_prob, (1 - m2m_prob) * 0.6, (1 - m2m_prob) * 0.4],
         )[0]
 
-        paperless_billing = (
-            "Yes" if random.random() < 0.59 + 0.15 * progress else "No"
-        )
+        paperless_billing = "Yes" if random.random() < 0.59 + 0.15 * progress else "No"
 
         payment_method = random.choices(
             [
@@ -319,9 +305,7 @@ def generate_tabular_data(config: dict = None) -> pd.DataFrame:
             base += 12
 
         monthly_charges = round(base * random.uniform(0.95, 1.05), 2)
-        total_charges = round(
-            monthly_charges * tenure * random.uniform(0.97, 1.03), 2
-        )
+        total_charges = round(monthly_charges * tenure * random.uniform(0.97, 1.03), 2)
 
         churn_base = 0.45
         if contract == "Month-to-month":
@@ -395,21 +379,15 @@ def generate_conversation(customer: dict) -> dict:
     elif issue_type == "service_outage":
         complaint = complaint_template.format(
             service=customer["InternetService"],
-            time=random.choice(
-                ["this morning", "yesterday morning", "last night", "2 days ago"]
-            ),
+            time=random.choice(["this morning", "yesterday morning", "last night", "2 days ago"]),
             hours=random.randint(4, 72),
             days=random.randint(1, 7),
         )
     elif issue_type == "contract_confusion":
         complaint = complaint_template.format(
             contract=customer["Contract"].lower(),
-            actual_contract=random.choice(
-                ["Month-to-month", "One year", "Two year"]
-            ),
-            date=(
-                datetime.now() + timedelta(days=random.randint(30, 730))
-            ).strftime("%B %d, %Y"),
+            actual_contract=random.choice(["Month-to-month", "One year", "Two year"]),
+            date=(datetime.now() + timedelta(days=random.randint(30, 730))).strftime("%B %d, %Y"),
             feature=random.choice(
                 ["free installation", "premium tech support", "streaming bundle"]
             ),
@@ -417,9 +395,7 @@ def generate_conversation(customer: dict) -> dict:
     elif issue_type == "want_to_cancel":
         complaint = complaint_template.format(
             tenure=customer["tenure"],
-            feature=random.choice(
-                ["faster internet", "better support", "lower monthly price"]
-            ),
+            feature=random.choice(["faster internet", "better support", "lower monthly price"]),
         )
     else:
         complaint = complaint_template
@@ -429,18 +405,14 @@ def generate_conversation(customer: dict) -> dict:
     if issue_type == "billing_high":
         diff = round(customer["MonthlyCharges"] * random.uniform(0.15, 0.35), 2)
         resolution = resolution_template.format(
-            reason=random.choice(
-                ["late fee", "equipment rental", "one-time upgrade charge"]
-            ),
+            reason=random.choice(["late fee", "equipment rental", "one-time upgrade charge"]),
             credit=diff,
             normal=round(customer["MonthlyCharges"] - diff, 2),
             diff=diff,
         )
     elif issue_type == "service_slow":
         resolution = resolution_template.format(
-            date=(
-                datetime.now() + timedelta(days=random.randint(1, 7))
-            ).strftime("%B %d"),
+            date=(datetime.now() + timedelta(days=random.randint(1, 7))).strftime("%B %d"),
             credit=random.choice([10, 15, 20, 25, 30]),
         )
     elif issue_type == "service_outage":
@@ -564,8 +536,7 @@ def generate_knowledge_base(output_dir: str | Path):
             "id": 8,
             "title": "Technical support hours",
             "content": (
-                "24/7 phone support. "
-                "Chat available Mon–Fri 8 AM – 10 PM, weekends 9 AM – 8 PM."
+                "24/7 phone support. " "Chat available Mon–Fri 8 AM – 10 PM, weekends 9 AM – 8 PM."
             ),
         },
     ]
@@ -578,10 +549,7 @@ def generate_knowledge_base(output_dir: str | Path):
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(kb_data, f, ensure_ascii=False, indent=2)
 
-    print(
-        f"Knowledge base збережено: {csv_path} та {json_path} "
-        f"({len(kb_data)} документів)"
-    )
+    print(f"Knowledge base збережено: {csv_path} та {json_path} " f"({len(kb_data)} документів)")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -601,9 +569,7 @@ if __name__ == "__main__":
         default="config/config.yaml",
         help="Шлях до config.yaml (опціонально)",
     )
-    parser.add_argument(
-        "--samples", type=int, help="Кількість клієнтів (перевизначення)"
-    )
+    parser.add_argument("--samples", type=int, help="Кількість клієнтів (перевизначення)")
     parser.add_argument(
         "--conv-samples",
         type=int,
@@ -620,26 +586,14 @@ if __name__ == "__main__":
     config = load_config(args.config)
 
     # Пріоритет: CLI > config.yaml > дефолт
-    n_samples = (
-        args.samples
-        or config.get("generation", {}).get("samples", 50000)
-    )
-    conv_samples = (
-        args.conv_samples
-        or config.get("generation", {}).get("conv_samples", 7500)
-    )
-    output_dir = (
-        args.output_dir
-        or config.get("generation", {}).get("output_dir", "data")
-    )
+    n_samples = args.samples or config.get("generation", {}).get("samples", 50000)
+    conv_samples = args.conv_samples or config.get("generation", {}).get("conv_samples", 7500)
+    output_dir = args.output_dir or config.get("generation", {}).get("output_dir", "data")
 
     output_path = Path(output_dir)
     output_path.mkdir(exist_ok=True, parents=True)
 
-    print(
-        f"Генерація: {n_samples:,} клієнтів + {conv_samples:,} розмов "
-        f"→ {output_path}"
-    )
+    print(f"Генерація: {n_samples:,} клієнтів + {conv_samples:,} розмов " f"→ {output_path}")
 
     # 1. Табличні дані
     df_customers = generate_tabular_data(config)
@@ -650,12 +604,7 @@ if __name__ == "__main__":
     # Статистика churn drift
     df_customers["Year"] = pd.to_datetime(df_customers["RecordDate"]).dt.year
     print("\nChurn rate по роках:")
-    print(
-        df_customers.groupby("Year")["Churn"]
-        .value_counts(normalize=True)
-        .unstack()
-        .round(3)
-    )
+    print(df_customers.groupby("Year")["Churn"].value_counts(normalize=True).unstack().round(3))
 
     # 2. Support conversations
     print("\nГенерація support conversations...")
@@ -668,10 +617,7 @@ if __name__ == "__main__":
     df_conversations = pd.DataFrame(conv_data)
     conv_path = output_path / "support_conversations.csv"
     df_conversations.to_csv(conv_path, index=False)
-    print(
-        f"Згенеровано та збережено {len(df_conversations):,} розмов "
-        f"→ {conv_path}"
-    )
+    print(f"Згенеровано та збережено {len(df_conversations):,} розмов " f"→ {conv_path}")
 
     # 3. Knowledge base
     print("\nГенерація knowledge base...")

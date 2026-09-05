@@ -18,10 +18,11 @@ import httpx
 import pytest
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
-TIMEOUT = 10.0   # seconds
+TIMEOUT = 10.0  # seconds
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="session")
 def client() -> httpx.Client:
@@ -47,6 +48,7 @@ def sample_customer() -> dict:
 
 
 # ── L1: API Contract ──────────────────────────────────────────────────────────
+
 
 class TestApiContract:
     """Slide 17 Level 1 — API Contract Tests."""
@@ -83,12 +85,13 @@ class TestApiContract:
 
     def test_predict_missing_field_returns_422(self, client):
         """Invalid payload must return 422, NOT 500 (slide 15 smoke test)."""
-        bad_payload = {"tenure": 12}   # many required fields missing
+        bad_payload = {"tenure": 12}  # many required fields missing
         response = client.post("/predict", json=bad_payload)
         assert response.status_code == 422
 
 
 # ── L2: Model Behaviour ───────────────────────────────────────────────────────
+
 
 class TestModelBehaviour:
     """Slide 17 Level 2 — Model Behaviour Tests."""
@@ -122,6 +125,7 @@ class TestModelBehaviour:
 
 
 # ── L3: Performance SLA ───────────────────────────────────────────────────────
+
 
 class TestPerformanceSLA:
     """Slide 17 Level 3 — Performance SLA Tests."""

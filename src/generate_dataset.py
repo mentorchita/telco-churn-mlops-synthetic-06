@@ -49,9 +49,7 @@ def generate_telco_dataset_with_drift(
             ["Yes", "No"],
             weights=[52 + 10 * progress, 48 - 10 * progress],
         )[0]
-        has_dependents = (
-            "Yes" if random.random() < (0.3 - 0.1 * progress) else "No"
-        )
+        has_dependents = "Yes" if random.random() < (0.3 - 0.1 * progress) else "No"
 
         tenure = int(np.random.beta(2 + progress, 3 - 0.5 * progress) * 72)
         tenure = max(0, min(tenure, 72))
@@ -75,24 +73,12 @@ def generate_telco_dataset_with_drift(
             ) = secs
         else:
             base_yes = 0.5 + streaming_boost
-            online_security = (
-                "Yes" if random.random() < (base_yes * 0.7) else "No"
-            )
-            online_backup = (
-                "Yes" if random.random() < (base_yes * 0.8) else "No"
-            )
-            device_protection = (
-                "Yes" if random.random() < (base_yes * 0.75) else "No"
-            )
-            tech_support = (
-                "Yes" if random.random() < (base_yes * 0.6) else "No"
-            )
-            streaming_tv = (
-                "Yes" if random.random() < (base_yes + 0.1) else "No"
-            )
-            streaming_movies = (
-                "Yes" if random.random() < (base_yes + 0.1) else "No"
-            )
+            online_security = "Yes" if random.random() < (base_yes * 0.7) else "No"
+            online_backup = "Yes" if random.random() < (base_yes * 0.8) else "No"
+            device_protection = "Yes" if random.random() < (base_yes * 0.75) else "No"
+            tech_support = "Yes" if random.random() < (base_yes * 0.6) else "No"
+            streaming_tv = "Yes" if random.random() < (base_yes + 0.1) else "No"
+            streaming_movies = "Yes" if random.random() < (base_yes + 0.1) else "No"
 
         multiple_lines = (
             "No phone service"
@@ -106,9 +92,7 @@ def generate_telco_dataset_with_drift(
             weights=[m2m_prob, (1 - m2m_prob) * 0.6, (1 - m2m_prob) * 0.4],
         )[0]
 
-        paperless_billing = (
-            "Yes" if random.random() < 0.59 + 0.15 * progress else "No"
-        )
+        paperless_billing = "Yes" if random.random() < 0.59 + 0.15 * progress else "No"
 
         payment_method = random.choices(
             [
@@ -153,12 +137,8 @@ def generate_telco_dataset_with_drift(
         elif contract == "Two year":
             base *= 0.88 - 0.03 * progress  # знижки трохи зменшуються
 
-        monthly_charges = round(
-            max(18.5, base + np.random.normal(0, 6)), 2
-        )
-        total_charges = round(
-            monthly_charges * tenure * random.uniform(0.97, 1.03), 2
-        )
+        monthly_charges = round(max(18.5, base + np.random.normal(0, 6)), 2)
+        total_charges = round(monthly_charges * tenure * random.uniform(0.97, 1.03), 2)
 
         # Churn — знижується з часом (компанія покращує сервіс)
         churn_base = 0.45
@@ -239,12 +219,7 @@ def generate_telco_dataset_with_drift(
     print(f"Файл: {output_file}")
     print("\nРозподіл Churn по роках:")
     df["Year"] = pd.to_datetime(df["RecordDate"]).dt.year
-    print(
-        df.groupby("Year")["Churn"]
-        .value_counts(normalize=True)
-        .unstack()
-        .round(3)
-    )
+    print(df.groupby("Year")["Churn"].value_counts(normalize=True).unstack().round(3))
 
 
 # === ЗАПУСК ===

@@ -11,8 +11,8 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-
 # ── Sample DataFrames ─────────────────────────────────────────────────────────
+
 
 @pytest.fixture()
 def sample_raw_df() -> pd.DataFrame:
@@ -23,22 +23,33 @@ def sample_raw_df() -> pd.DataFrame:
     LAB 2 Scenario C: change  tenure: int  →  tenure: str  here to trigger
     pandera.errors.SchemaError: Expected int64, got object.
     """
-    return pd.DataFrame({
-        "customerID":      ["0001", "0002", "0003", "0004", "0005"],
-        "tenure":          [1,  24, 60, 12,  6],         # int  ← DO NOT change
-        "MonthlyCharges":  [29.85, 56.95, 42.30, 89.10, 20.05],
-        "TotalCharges":    [29.85, 1889.50, 2320.80, 1138.80, 172.70],
-        "SeniorCitizen":   [0, 0, 1, 0, 0],
-        "Contract":        ["Month-to-month", "One year", "Two year",
-                            "Month-to-month", "Month-to-month"],
-        "PaymentMethod":   ["Electronic check", "Bank transfer (automatic)",
-                            "Credit card (automatic)", "Mailed check",
-                            "Electronic check"],
-        "InternetService": ["Fiber optic", "DSL", "Fiber optic", "DSL", "No"],
-        "OnlineSecurity":  ["No", "Yes", "Yes", "No", "No"],
-        "TechSupport":     ["No", "Yes", "No", "Yes", "No"],
-        "Churn":           ["Yes", "No", "No", "Yes", "Yes"],
-    })
+    return pd.DataFrame(
+        {
+            "customerID": ["0001", "0002", "0003", "0004", "0005"],
+            "tenure": [1, 24, 60, 12, 6],  # int  ← DO NOT change
+            "MonthlyCharges": [29.85, 56.95, 42.30, 89.10, 20.05],
+            "TotalCharges": [29.85, 1889.50, 2320.80, 1138.80, 172.70],
+            "SeniorCitizen": [0, 0, 1, 0, 0],
+            "Contract": [
+                "Month-to-month",
+                "One year",
+                "Two year",
+                "Month-to-month",
+                "Month-to-month",
+            ],
+            "PaymentMethod": [
+                "Electronic check",
+                "Bank transfer (automatic)",
+                "Credit card (automatic)",
+                "Mailed check",
+                "Electronic check",
+            ],
+            "InternetService": ["Fiber optic", "DSL", "Fiber optic", "DSL", "No"],
+            "OnlineSecurity": ["No", "Yes", "Yes", "No", "No"],
+            "TechSupport": ["No", "Yes", "No", "Yes", "No"],
+            "Churn": ["Yes", "No", "No", "Yes", "Yes"],
+        }
+    )
 
 
 @pytest.fixture()

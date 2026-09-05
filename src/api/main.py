@@ -83,6 +83,7 @@ async def startup_event() -> None:
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 
+
 class CustomerInput(BaseModel):
     """Single customer for churn prediction.
 
@@ -100,7 +101,7 @@ class CustomerInput(BaseModel):
     InternetService: str
     OnlineSecurity: str
     TechSupport: str
-    Churn: Optional[str] = "No"   # ignored in prediction, required by encode_features
+    Churn: Optional[str] = "No"  # ignored in prediction, required by encode_features
 
     @validator("Contract")
     def validate_contract(cls, v):
@@ -146,6 +147,7 @@ class HealthResponse(BaseModel):
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _predict_single(customer: CustomerInput) -> float:
     """Run model inference, return churn probability."""
     if not _model_loaded or _model is None:
@@ -164,6 +166,7 @@ def _predict_single(customer: CustomerInput) -> float:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @app.get("/health", response_model=HealthResponse, tags=["ops"])
 def health() -> HealthResponse:
@@ -188,20 +191,20 @@ def predict(customer: CustomerInput) -> PredictionResponse:
     )
 
 
-@app.post("/predict/batch",
-          response_model=List[PredictionResponse],
-          tags=["prediction"])
+@app.post("/predict/batch", response_model=List[PredictionResponse], tags=["prediction"])
 def predict_batch(request: BatchRequest) -> List[PredictionResponse]:
     """Predict churn probability for up to 200 customers at once."""
     results = []
     for customer in request.customers:
         prob = _predict_single(customer)
-        results.append(PredictionResponse(
-            customerID=customer.customerID,
-            churn_probability=round(prob, 4),
-            churn_predicted=prob >= 0.5,
-            model_version=_model_version,
-        ))
+        results.append(
+            PredictionResponse(
+                customerID=customer.customerID,
+                churn_probability=round(prob, 4),
+                churn_predicted=prob >= 0.5,
+                model_version=_model_version,
+            )
+        )
     return results
 
 

@@ -15,7 +15,6 @@ import pandera as pa
 import pytest
 from pandera import Column, DataFrameSchema, Check
 
-
 # ── Pandera schema definition ─────────────────────────────────────────────────
 
 TELCO_SCHEMA = DataFrameSchema(
@@ -34,7 +33,7 @@ TELCO_SCHEMA = DataFrameSchema(
         "TotalCharges": Column(
             float,
             checks=[Check.ge(0.0)],
-            nullable=True,   # may be missing for new customers
+            nullable=True,  # may be missing for new customers
         ),
         "SeniorCitizen": Column(
             int,
@@ -48,12 +47,16 @@ TELCO_SCHEMA = DataFrameSchema(
         ),
         "PaymentMethod": Column(
             str,
-            checks=[Check.isin([
-                "Bank transfer (automatic)",
-                "Credit card (automatic)",
-                "Electronic check",
-                "Mailed check",
-            ])],
+            checks=[
+                Check.isin(
+                    [
+                        "Bank transfer (automatic)",
+                        "Credit card (automatic)",
+                        "Electronic check",
+                        "Mailed check",
+                    ]
+                )
+            ],
             nullable=False,
         ),
         "InternetService": Column(
@@ -77,7 +80,7 @@ TELCO_SCHEMA = DataFrameSchema(
             nullable=False,
         ),
     },
-    coerce=False,   # strict — do not auto-cast types
+    coerce=False,  # strict — do not auto-cast types
 )
 
 
@@ -91,6 +94,7 @@ def validate_telco_data(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
+
 
 class TestValidTelcoData:
     """Valid data must pass without exceptions."""
@@ -124,7 +128,7 @@ class TestInvalidData:
 
     def test_bad_contract_value_raises(self, sample_raw_df):
         bad = sample_raw_df.copy()
-        bad.loc[0, "Contract"] = "Quarterly"   # not in allowed set
+        bad.loc[0, "Contract"] = "Quarterly"  # not in allowed set
         with pytest.raises(pa.errors.SchemaError):
             validate_telco_data(bad)
 
@@ -137,7 +141,7 @@ class TestInvalidData:
     def test_wrong_tenure_type_raises(self, sample_raw_df):
         """LAB 2 Scenario C: this is what changing tenure to str triggers."""
         bad = sample_raw_df.copy()
-        bad["tenure"] = bad["tenure"].astype(str)   # str instead of int
+        bad["tenure"] = bad["tenure"].astype(str)  # str instead of int
         with pytest.raises(pa.errors.SchemaError):
             validate_telco_data(bad)
 

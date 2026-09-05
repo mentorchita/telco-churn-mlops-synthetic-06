@@ -35,6 +35,7 @@ CATEGORICAL_FEATURES = ["Contract", "PaymentMethod"]
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def psi(expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
     """Population Stability Index.
 
@@ -64,9 +65,11 @@ def load_current() -> pd.DataFrame:
     """
     try:
         import boto3  # noqa: F401
+
         s3_path = os.getenv("CURRENT_DATA_S3", "")
         if s3_path:
             import io
+
             s3 = boto3.client("s3")
             bucket, key = s3_path.replace("s3://", "").split("/", 1)
             obj = s3.get_object(Bucket=bucket, Key=key)
@@ -86,6 +89,7 @@ def load_current() -> pd.DataFrame:
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture(scope="module")
 def data_pair():
     """Load reference and current datasets once for all drift tests."""
@@ -95,6 +99,7 @@ def data_pair():
 
 
 # ── Drift tests ───────────────────────────────────────────────────────────────
+
 
 class TestNumericDrift:
     """KS-test for numeric features (slide 28)."""
@@ -159,10 +164,7 @@ class TestOverallDrift:
 
         for feature in NUMERIC_FEATURES:
             if feature in ref.columns and feature in cur.columns:
-                _, p = stats.ks_2samp(
-                    ref[feature].dropna().values,
-                    cur[feature].dropna().values
-                )
+                _, p = stats.ks_2samp(ref[feature].dropna().values, cur[feature].dropna().values)
                 total += 1
                 if p < P_VALUE_THRESHOLD:
                     drifted += 1
@@ -227,8 +229,11 @@ class TestEvidently:
             from evidently.metric_preset import DataDriftPreset
 
             ref, cur = data_pair
-            cols = [c for c in NUMERIC_FEATURES + CATEGORICAL_FEATURES
-                    if c in ref.columns and c in cur.columns]
+            cols = [
+                c
+                for c in NUMERIC_FEATURES + CATEGORICAL_FEATURES
+                if c in ref.columns and c in cur.columns
+            ]
 
             report = Report(metrics=[DataDriftPreset(columns=cols)])
             report.run(reference_data=ref[cols], current_data=cur[cols])

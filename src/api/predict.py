@@ -8,6 +8,7 @@ from typing import Dict
 try:
     import mlflow
     import mlflow.sklearn
+
     MLFLOW_AVAILABLE = True
 except ImportError:
     MLFLOW_AVAILABLE = False
@@ -17,9 +18,9 @@ except ImportError:
 MODEL_PATH = os.getenv("MODEL_PATH", "models/churn_model.pkl")
 
 # MLflow model settings
-MLFLOW_TRACKING_URI = os.getenv('MLFLOW_TRACKING_URI', '').strip()
-MLFLOW_MODEL_NAME = os.getenv('MLFLOW_MODEL_NAME', 'ChurnModel')
-MLFLOW_MODEL_STAGE = os.getenv('MLFLOW_MODEL_STAGE', 'Production')
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "").strip()
+MLFLOW_MODEL_NAME = os.getenv("MLFLOW_MODEL_NAME", "ChurnModel")
+MLFLOW_MODEL_STAGE = os.getenv("MLFLOW_MODEL_STAGE", "Production")
 
 model = None
 model_source = None
@@ -63,19 +64,15 @@ def preprocess_features(features: Dict) -> pd.DataFrame:
     df = pd.DataFrame([features])
 
     # Ensure numeric columns are numeric (common potential issue)
-    if 'TotalCharges' in df.columns:
-        df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
-    if 'MonthlyCharges' in df.columns:
-        df['MonthlyCharges'] = pd.to_numeric(df['MonthlyCharges'], errors='coerce')
-    if 'tenure' in df.columns:
-        df['tenure'] = pd.to_numeric(df['tenure'], errors='coerce')
+    if "TotalCharges" in df.columns:
+        df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
+    if "MonthlyCharges" in df.columns:
+        df["MonthlyCharges"] = pd.to_numeric(df["MonthlyCharges"], errors="coerce")
+    if "tenure" in df.columns:
+        df["tenure"] = pd.to_numeric(df["tenure"], errors="coerce")
 
     # Fill NA with reasonable defaults (pipeline may still raise if unexpected)
-    df = df.fillna({
-        'TotalCharges': 0,
-        'MonthlyCharges': 0,
-        'tenure': 0
-    })
+    df = df.fillna({"TotalCharges": 0, "MonthlyCharges": 0, "tenure": 0})
 
     return df
 
@@ -88,7 +85,7 @@ def predict_churn(features: Dict) -> Dict:
         X = preprocess_features(features)
 
         # Some MLflow-loaded models may be pyfunc wrappers; prefer predict_proba when available
-        if hasattr(model, 'predict_proba'):
+        if hasattr(model, "predict_proba"):
             prob = model.predict_proba(X)[0][1]
         else:
             # fallback to predict (binary 0/1) and map to probability-like value
@@ -100,7 +97,7 @@ def predict_churn(features: Dict) -> Dict:
         return {
             "churn_probability": round(float(prob), 4),
             "churn_prediction": int(pred),
-            "features_used": list(X.columns)
+            "features_used": list(X.columns),
         }
     except Exception as e:
         return {"error": str(e)}
