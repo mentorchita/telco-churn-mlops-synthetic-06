@@ -29,4 +29,3 @@ class PredictionResponse(BaseModel):
     churn_probability: float
     churn_prediction: int  # 0 або 1
     features_used: List[str]
-    
