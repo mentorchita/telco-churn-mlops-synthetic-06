@@ -1,10 +1,8 @@
 import pandas as pd
 import numpy as np
 import random
-from faker import Faker
 from datetime import datetime, timedelta
 
-fake = Faker()
 random.seed(42)
 np.random.seed(42)
 

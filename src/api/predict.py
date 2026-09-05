@@ -48,7 +48,10 @@ if model is None:
         model_source = None
 
 if model is None:
-    print("Warning: No model loaded - predictions will fail until model is available", file=sys.stderr)
+    print(
+        "Warning: No model loaded - predictions will fail until model is available",
+        file=sys.stderr,
+    )
 
 
 def preprocess_features(features: Dict) -> pd.DataFrame:

@@ -3,12 +3,10 @@ import numpy as np
 import random
 import json
 import yaml
-from faker import Faker
 from datetime import datetime, timedelta
 from pathlib import Path
 import argparse
 
-fake = Faker()
 random.seed(42)
 np.random.seed(42)
 
