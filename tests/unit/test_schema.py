@@ -88,7 +88,7 @@ def validate_telco_data(df: pd.DataFrame) -> pd.DataFrame:
     """Validate raw Telco Churn DataFrame against the schema.
 
     Raises:
-        pandera.errors.SchemaError: if any constraint is violated.
+        pandera.errors.SchemaErrors: if any constraint is violated (lazy=True).
     """
     return TELCO_SCHEMA.validate(df, lazy=True)
 
@@ -111,38 +111,38 @@ class TestInvalidData:
     def test_negative_tenure_raises(self, sample_raw_df):
         bad = sample_raw_df.copy()
         bad.loc[0, "tenure"] = -1
-        with pytest.raises(pa.errors.SchemaError):
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)):
             validate_telco_data(bad)
 
     def test_tenure_over_72_raises(self, sample_raw_df):
         bad = sample_raw_df.copy()
         bad.loc[0, "tenure"] = 100
-        with pytest.raises(pa.errors.SchemaError):
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)):
             validate_telco_data(bad)
 
     def test_null_monthly_charges_raises(self, sample_raw_df):
         bad = sample_raw_df.copy()
         bad.loc[0, "MonthlyCharges"] = None
-        with pytest.raises(pa.errors.SchemaError):
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)):
             validate_telco_data(bad)
 
     def test_bad_contract_value_raises(self, sample_raw_df):
         bad = sample_raw_df.copy()
         bad.loc[0, "Contract"] = "Quarterly"  # not in allowed set
-        with pytest.raises(pa.errors.SchemaError):
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)):
             validate_telco_data(bad)
 
     def test_bad_churn_value_raises(self, sample_raw_df):
         bad = sample_raw_df.copy()
         bad.loc[0, "Churn"] = "Maybe"
-        with pytest.raises(pa.errors.SchemaError):
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)):
             validate_telco_data(bad)
 
     def test_wrong_tenure_type_raises(self, sample_raw_df):
         """LAB 2 Scenario C: this is what changing tenure to str triggers."""
         bad = sample_raw_df.copy()
         bad["tenure"] = bad["tenure"].astype(str)  # str instead of int
-        with pytest.raises(pa.errors.SchemaError):
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)):
             validate_telco_data(bad)
 
 
@@ -151,7 +151,7 @@ class TestMissingColumn:
 
     def test_missing_tenure_raises(self, sample_raw_df):
         df = sample_raw_df.drop(columns=["tenure"])
-        with pytest.raises(pa.errors.SchemaError) as exc_info:
+        with pytest.raises((pa.errors.SchemaError, pa.errors.SchemaErrors)) as exc_info:
             validate_telco_data(df)
         # Error message should mention the missing column
         assert "tenure" in str(exc_info.value).lower()
