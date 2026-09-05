@@ -135,8 +135,10 @@ class TestPerformanceSLA:
             response = client.post("/predict", json=sample_customer)
             latencies.append((time.monotonic() - t0) * 1000)
             assert response.status_code == 200
-        p99 = sorted(latencies)[int(len(latencies) * 0.99)] if len(latencies) > 1 \
-              else latencies[-1]
+        if len(latencies) > 1:
+            p99 = sorted(latencies)[int(len(latencies) * 0.99)]
+        else:
+            p99 = latencies[-1]
         assert p99 < 200, f"P99 latency {p99:.1f} ms exceeds 200 ms threshold"
 
     def test_batch_50_customers_succeeds(self, client, sample_customer):

@@ -7,7 +7,7 @@ These run WITHOUT model training — fast (<5 s total).
 
 from __future__ import annotations
 
-import numpy as np
+import numpy as np  # used in TestGetXY.test_returns_numpy_arrays
 import pandas as pd
 import pytest
 
@@ -141,6 +141,5 @@ class TestGetXY:
 
     def test_returns_numpy_arrays(self, sample_raw_df):
         X, y = get_X_y(sample_raw_df)
-        import numpy as np
         assert isinstance(X, np.ndarray)
         assert isinstance(y, np.ndarray)

@@ -12,7 +12,6 @@ Then restore  MIN_AUC = 0.82  to fix.
 from __future__ import annotations
 
 import mlflow
-import numpy as np
 import pandas as pd
 import pytest
 from sklearn.dummy import DummyClassifier
@@ -24,8 +23,8 @@ from src.features.build_features import get_X_y
 
 # ── Quality gate thresholds (slide 12) ───────────────────────────────────────
 # LAB 2 Scenario A: change this to 0.99 → AssertionError, then restore 0.82
-MIN_AUC       = 0.82
-MIN_F1        = 0.70
+MIN_AUC = 0.82
+MIN_F1 = 0.70
 MIN_PRECISION = 0.75
 EXPECTED_FEATURE_COUNT = 19   # slide 12: "Feature count = 19"
 

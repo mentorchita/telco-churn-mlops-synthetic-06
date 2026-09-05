@@ -1,0 +1,214 @@
+From 28a8d0e57e90d8f2646a60d883db7524c124e349 Mon Sep 17 00:00:00 2001
+From: MLOps CI Fix <ci-fix@mlops.course>
+Date: Sat, 5 Sep 2026 19:48:21 +0000
+Subject: [PATCH] fix: resolve all flake8 lint errors blocking CI pipeline
+
+Errors fixed across 6 files:
+- src/models/train.py:    remove unused Path/numpy imports (F401);
+                          align operators without extra spaces (E221);
+                          remove unused local variable feature_names (F841)
+- tests/unit/test_model.py:  remove unused numpy import (F401);
+                              fix operator alignment (E221)
+- tests/unit/test_features.py: remove top-level numpy re-import (F401);
+                                remove inner import numpy re-definition (F811)
+- tests/unit/test_drift.py:  fix operator alignment in psi() (E221);
+                              split long lines (E501 > 100 chars);
+                              remove unused all_features variable (F841)
+- tests/integration/test_api.py: fix over-indented continuation line (E127)
+- tests/test_generation.py:  remove unused pytest import (F401);
+                              add 2 blank lines before function (E302)
+
+Slide 11 reference: these are the exact tools run in the lint-and-test CI job.
+---
+ src/models/train.py           | 26 +++++++++++---------------
+ tests/integration/test_api.py |  6 ++++--
+ tests/test_generation.py      |  3 ++-
+ tests/unit/test_drift.py      |  9 +++++----
+ tests/unit/test_features.py   |  3 +--
+ tests/unit/test_model.py      |  5 ++---
+ 6 files changed, 25 insertions(+), 27 deletions(-)
+
+diff --git a/src/models/train.py b/src/models/train.py
+index 8c14813..272864a 100644
+--- a/src/models/train.py
++++ b/src/models/train.py
+@@ -22,11 +22,8 @@ from __future__ import annotations
+ import argparse
+ import logging
+ import sys
+-from pathlib import Path
+-
+ import mlflow
+ import mlflow.xgboost
+-import numpy as np
+ import pandas as pd
+ from sklearn.dummy import DummyClassifier
+ from sklearn.metrics import (
+@@ -37,15 +34,15 @@ from sklearn.metrics import (
+ from sklearn.model_selection import train_test_split
+ from xgboost import XGBClassifier
+ 
+-from src.features.build_features import FEATURE_COLUMNS, TARGET_COLUMN, get_X_y
++from src.features.build_features import get_X_y
+ 
+ logging.basicConfig(level=logging.INFO,
+                     format="%(asctime)s  %(levelname)s  %(name)s  %(message)s")
+ logger = logging.getLogger(__name__)
+ 
+ # ── Quality gate thresholds (slide 12) ───────────────────────────────────────
+-MIN_AUC       = 0.82
+-MIN_F1        = 0.70
++MIN_AUC = 0.82
++MIN_F1 = 0.70
+ MIN_PRECISION = 0.75
+ EXPECTED_FEATURES = 19   # must equal len(FEATURE_COLUMNS) - 1 (exclude target)
+ 
+@@ -123,11 +120,11 @@ def train(data_path: str = "data/raw/telco_train.csv",
+                   verbose=False)
+ 
+         # ── Evaluate ──────────────────────────────────────────────────────
+-        y_pred      = model.predict(X_test)
+-        y_proba     = model.predict_proba(X_test)[:, 1]
++        y_pred = model.predict(X_test)
++        y_proba = model.predict_proba(X_test)[:, 1]
+ 
+-        auc  = roc_auc_score(y_test, y_proba)
+-        f1   = f1_score(y_test, y_pred)
++        auc = roc_auc_score(y_test, y_proba)
++        f1 = f1_score(y_test, y_pred)
+         prec = precision_score(y_test, y_pred)
+ 
+         mlflow.log_metric("roc_auc",   auc)
+@@ -139,11 +136,11 @@ def train(data_path: str = "data/raw/telco_train.csv",
+         # ── Dummy baseline ────────────────────────────────────────────────
+         dummy = DummyClassifier(strategy="most_frequent", random_state=42)
+         dummy.fit(X_train, y_train)
+-        d_pred  = dummy.predict(X_test)
++        d_pred = dummy.predict(X_test)
+         d_proba = dummy.predict_proba(X_test)[:, 1]
+-        d_auc   = roc_auc_score(y_test, d_proba)
+-        d_f1    = f1_score(y_test, d_pred, zero_division=0)
+-        d_prec  = precision_score(y_test, d_pred, zero_division=0)
++        d_auc = roc_auc_score(y_test, d_proba)
++        d_f1 = f1_score(y_test, d_pred, zero_division=0)
++        d_prec = precision_score(y_test, d_pred, zero_division=0)
+ 
+         mlflow.log_metric("dummy_roc_auc",   d_auc)
+         mlflow.log_metric("dummy_f1_score",  d_f1)
+@@ -153,7 +150,6 @@ def train(data_path: str = "data/raw/telco_train.csv",
+         quality_gate(auc, f1, prec, d_auc, d_f1, d_prec, n_features)
+ 
+         # ── Log model ─────────────────────────────────────────────────────
+-        feature_names = [c for c in FEATURE_COLUMNS if c != TARGET_COLUMN]
+         signature = mlflow.models.infer_signature(
+             X_train, model.predict_proba(X_train)[:, 1]
+         )
+diff --git a/tests/integration/test_api.py b/tests/integration/test_api.py
+index 222a5fd..7ce8c7d 100644
+--- a/tests/integration/test_api.py
++++ b/tests/integration/test_api.py
+@@ -135,8 +135,10 @@ class TestPerformanceSLA:
+             response = client.post("/predict", json=sample_customer)
+             latencies.append((time.monotonic() - t0) * 1000)
+             assert response.status_code == 200
+-        p99 = sorted(latencies)[int(len(latencies) * 0.99)] if len(latencies) > 1 \
+-              else latencies[-1]
++        if len(latencies) > 1:
++            p99 = sorted(latencies)[int(len(latencies) * 0.99)]
++        else:
++            p99 = latencies[-1]
+         assert p99 < 200, f"P99 latency {p99:.1f} ms exceeds 200 ms threshold"
+ 
+     def test_batch_50_customers_succeeds(self, client, sample_customer):
+diff --git a/tests/test_generation.py b/tests/test_generation.py
+index dd38079..f989e3a 100644
+--- a/tests/test_generation.py
++++ b/tests/test_generation.py
+@@ -1,4 +1,5 @@
+-import pytest
+ # Тести для генерації даних
++
++
+ def test_generate_dataset():
+     assert True  # Placeholder
+diff --git a/tests/unit/test_drift.py b/tests/unit/test_drift.py
+index c136004..2924f7a 100644
+--- a/tests/unit/test_drift.py
++++ b/tests/unit/test_drift.py
+@@ -43,9 +43,10 @@ def psi(expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
+     > 0.25    → significant drift (consider retraining)
+     """
+     expected_pct = np.histogram(expected, bins=buckets)[0] / len(expected)
+-    actual_pct   = np.histogram(actual,   bins=np.histogram(expected, bins=buckets)[1])[0] / len(actual)
++    ref_bins = np.histogram(expected, bins=buckets)[1]
++    actual_pct = np.histogram(actual, bins=ref_bins)[0] / len(actual)
+     expected_pct = np.clip(expected_pct, 1e-6, None)
+-    actual_pct   = np.clip(actual_pct,   1e-6, None)
++    actual_pct = np.clip(actual_pct, 1e-6, None)
+     return float(np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct)))
+ 
+ 
+@@ -78,7 +79,8 @@ def load_current() -> pd.DataFrame:
+     ref = pd.read_csv(REFERENCE_DATA_PATH)
+     sample = ref.sample(frac=0.15, random_state=42).copy()
+     # Introduce small artificial drift so the test is meaningful
+-    sample["tenure"] = (sample["tenure"] * rng.uniform(0.9, 1.1, len(sample))).astype(int).clip(0, 72)
++    noise = rng.uniform(0.9, 1.1, len(sample))
++    sample["tenure"] = (sample["tenure"] * noise).astype(int).clip(0, 72)
+     return sample
+ 
+ 
+@@ -152,7 +154,6 @@ class TestOverallDrift:
+     def test_overall_drift_below_threshold(self, data_pair):
+         """Fail if > DRIFT_THRESHOLD fraction of features drift significantly."""
+         ref, cur = data_pair
+-        all_features = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+         drifted = 0
+         total = 0
+ 
+diff --git a/tests/unit/test_features.py b/tests/unit/test_features.py
+index 0cb3aa1..f3052ad 100644
+--- a/tests/unit/test_features.py
++++ b/tests/unit/test_features.py
+@@ -7,7 +7,7 @@ These run WITHOUT model training — fast (<5 s total).
+ 
+ from __future__ import annotations
+ 
+-import numpy as np
++import numpy as np  # used in TestGetXY.test_returns_numpy_arrays
+ import pandas as pd
+ import pytest
+ 
+@@ -141,6 +141,5 @@ class TestGetXY:
+ 
+     def test_returns_numpy_arrays(self, sample_raw_df):
+         X, y = get_X_y(sample_raw_df)
+-        import numpy as np
+         assert isinstance(X, np.ndarray)
+         assert isinstance(y, np.ndarray)
+diff --git a/tests/unit/test_model.py b/tests/unit/test_model.py
+index 165ac7d..8215b0b 100644
+--- a/tests/unit/test_model.py
++++ b/tests/unit/test_model.py
+@@ -12,7 +12,6 @@ Then restore  MIN_AUC = 0.82  to fix.
+ from __future__ import annotations
+ 
+ import mlflow
+-import numpy as np
+ import pandas as pd
+ import pytest
+ from sklearn.dummy import DummyClassifier
+@@ -24,8 +23,8 @@ from src.features.build_features import get_X_y
+ 
+ # ── Quality gate thresholds (slide 12) ───────────────────────────────────────
+ # LAB 2 Scenario A: change this to 0.99 → AssertionError, then restore 0.82
+-MIN_AUC       = 0.82
+-MIN_F1        = 0.70
++MIN_AUC = 0.82
++MIN_F1 = 0.70
+ MIN_PRECISION = 0.75
+ EXPECTED_FEATURE_COUNT = 19   # slide 12: "Feature count = 19"
+ 
+-- 
+2.43.0
+

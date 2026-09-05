@@ -43,9 +43,10 @@ def psi(expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
     > 0.25    → significant drift (consider retraining)
     """
     expected_pct = np.histogram(expected, bins=buckets)[0] / len(expected)
-    actual_pct   = np.histogram(actual,   bins=np.histogram(expected, bins=buckets)[1])[0] / len(actual)
+    ref_bins = np.histogram(expected, bins=buckets)[1]
+    actual_pct = np.histogram(actual, bins=ref_bins)[0] / len(actual)
     expected_pct = np.clip(expected_pct, 1e-6, None)
-    actual_pct   = np.clip(actual_pct,   1e-6, None)
+    actual_pct = np.clip(actual_pct, 1e-6, None)
     return float(np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct)))
 
 
@@ -78,7 +79,8 @@ def load_current() -> pd.DataFrame:
     ref = pd.read_csv(REFERENCE_DATA_PATH)
     sample = ref.sample(frac=0.15, random_state=42).copy()
     # Introduce small artificial drift so the test is meaningful
-    sample["tenure"] = (sample["tenure"] * rng.uniform(0.9, 1.1, len(sample))).astype(int).clip(0, 72)
+    noise = rng.uniform(0.9, 1.1, len(sample))
+    sample["tenure"] = (sample["tenure"] * noise).astype(int).clip(0, 72)
     return sample
 
 
@@ -152,7 +154,6 @@ class TestOverallDrift:
     def test_overall_drift_below_threshold(self, data_pair):
         """Fail if > DRIFT_THRESHOLD fraction of features drift significantly."""
         ref, cur = data_pair
-        all_features = NUMERIC_FEATURES + CATEGORICAL_FEATURES
         drifted = 0
         total = 0
 

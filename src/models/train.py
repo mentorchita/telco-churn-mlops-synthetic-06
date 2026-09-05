@@ -22,11 +22,8 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from pathlib import Path
-
 import mlflow
 import mlflow.xgboost
-import numpy as np
 import pandas as pd
 from sklearn.dummy import DummyClassifier
 from sklearn.metrics import (
@@ -37,15 +34,15 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
-from src.features.build_features import FEATURE_COLUMNS, TARGET_COLUMN, get_X_y
+from src.features.build_features import get_X_y
 
 logging.basicConfig(level=logging.INFO,
                     format="%(asctime)s  %(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger(__name__)
 
 # ── Quality gate thresholds (slide 12) ───────────────────────────────────────
-MIN_AUC       = 0.82
-MIN_F1        = 0.70
+MIN_AUC = 0.82
+MIN_F1 = 0.70
 MIN_PRECISION = 0.75
 EXPECTED_FEATURES = 19   # must equal len(FEATURE_COLUMNS) - 1 (exclude target)
 
@@ -123,11 +120,11 @@ def train(data_path: str = "data/raw/telco_train.csv",
                   verbose=False)
 
         # ── Evaluate ──────────────────────────────────────────────────────
-        y_pred      = model.predict(X_test)
-        y_proba     = model.predict_proba(X_test)[:, 1]
+        y_pred = model.predict(X_test)
+        y_proba = model.predict_proba(X_test)[:, 1]
 
-        auc  = roc_auc_score(y_test, y_proba)
-        f1   = f1_score(y_test, y_pred)
+        auc = roc_auc_score(y_test, y_proba)
+        f1 = f1_score(y_test, y_pred)
         prec = precision_score(y_test, y_pred)
 
         mlflow.log_metric("roc_auc",   auc)
@@ -139,11 +136,11 @@ def train(data_path: str = "data/raw/telco_train.csv",
         # ── Dummy baseline ────────────────────────────────────────────────
         dummy = DummyClassifier(strategy="most_frequent", random_state=42)
         dummy.fit(X_train, y_train)
-        d_pred  = dummy.predict(X_test)
+        d_pred = dummy.predict(X_test)
         d_proba = dummy.predict_proba(X_test)[:, 1]
-        d_auc   = roc_auc_score(y_test, d_proba)
-        d_f1    = f1_score(y_test, d_pred, zero_division=0)
-        d_prec  = precision_score(y_test, d_pred, zero_division=0)
+        d_auc = roc_auc_score(y_test, d_proba)
+        d_f1 = f1_score(y_test, d_pred, zero_division=0)
+        d_prec = precision_score(y_test, d_pred, zero_division=0)
 
         mlflow.log_metric("dummy_roc_auc",   d_auc)
         mlflow.log_metric("dummy_f1_score",  d_f1)
@@ -153,7 +150,6 @@ def train(data_path: str = "data/raw/telco_train.csv",
         quality_gate(auc, f1, prec, d_auc, d_f1, d_prec, n_features)
 
         # ── Log model ─────────────────────────────────────────────────────
-        feature_names = [c for c in FEATURE_COLUMNS if c != TARGET_COLUMN]
         signature = mlflow.models.infer_signature(
             X_train, model.predict_proba(X_train)[:, 1]
         )
