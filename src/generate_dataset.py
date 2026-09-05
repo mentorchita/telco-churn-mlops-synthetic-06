@@ -18,7 +18,7 @@ def generate_telco_dataset_with_drift(
     end = datetime.strptime(end_date, "%Y-%m-%d")
     total_days = (end - start).days
 
-    for i in range(n_samples):
+    for _i in range(n_samples):
         # Випадкова дата в діапазоні
         record_date = start + timedelta(days=random.randint(0, total_days))
         # 0.0 → 1.0 (2023 → 2024)
