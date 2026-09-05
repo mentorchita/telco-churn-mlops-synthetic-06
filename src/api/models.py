@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 
+
 class CustomerFeatures(BaseModel):
     tenure: int
     MonthlyCharges: float
@@ -21,6 +22,7 @@ class CustomerFeatures(BaseModel):
     Contract: str
     PaperlessBilling: str
     PaymentMethod: str
+
 
 class PredictionResponse(BaseModel):
     customer_id: Optional[str] = None
