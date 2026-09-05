@@ -1,0 +1,45 @@
+--- a/src/generate_dataset_ext.py	2026-09-05 21:38:37.384655082 +0000
++++ b/src/generate_dataset_ext.py	2026-09-05 21:36:55.564650677 +0000
+@@ -182,7 +182,7 @@
+         return yaml.safe_load(f) or {}
+ 
+ 
+-def generate_tabular_data(config: dict = None) -> pd.DataFrame:
++def generate_tabular_data(config: dict | None = None) -> pd.DataFrame:
+     config = config or {}
+     gen = config.get("generation", {})
+     drift = config.get("drift", {})
+--- a/src/api/main.py	2026-09-05 21:38:37.488655087 +0000
++++ b/src/api/main.py	2026-09-05 21:36:55.564650677 +0000
+@@ -135,7 +135,7 @@
+ 
+ 
+ class BatchRequest(BaseModel):
+-    customers: List[CustomerInput] = Field(..., max_items=200)
++    customers: List[CustomerInput] = Field(..., max_length=200)
+ 
+ 
+ class HealthResponse(BaseModel):
+--- a/pyproject.toml	2026-09-05 21:38:37.580655091 +0000
++++ b/pyproject.toml	2026-09-05 21:38:37.268655077 +0000
+@@ -24,6 +24,20 @@
+ warn_unused_ignores = true
+ strict_optional = true
+ 
++# Local ./mlflow/ directory shadows the real mlflow package.
++# Skip it so mypy does not treat the empty namespace as the real library.
++[[tool.mypy.overrides]]
++module = "mlflow"
++ignore_missing_imports = true
++follow_imports = "skip"
++ignore_errors = true
++
++[[tool.mypy.overrides]]
++module = "mlflow.*"
++ignore_missing_imports = true
++follow_imports = "skip"
++ignore_errors = true
++
+ # ── coverage ──────────────────────────────────────────────────────────────────
+ [tool.coverage.run]
+ source = ["src"]
