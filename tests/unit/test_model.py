@@ -61,12 +61,8 @@ def _make_synthetic_train_df(n: int = 5000, seed: int = 42) -> pd.DataFrame:
         size=n,
         p=[0.40, 0.15, 0.25, 0.20],
     )
-    internet = rng.choice(
-        ["DSL", "Fiber optic", "No"], size=n, p=[0.30, 0.50, 0.20]
-    )
-    online_sec = np.where(
-        internet == "No", "No", rng.choice(["Yes", "No"], size=n)
-    )
+    internet = rng.choice(["DSL", "Fiber optic", "No"], size=n, p=[0.30, 0.50, 0.20])
+    online_sec = np.where(internet == "No", "No", rng.choice(["Yes", "No"], size=n))
     tech = np.where(internet == "No", "No", rng.choice(["Yes", "No"], size=n))
 
     logit = (
@@ -170,25 +166,19 @@ class TestModelQualityGate:
 
     def test_beats_dummy_classifier_auc(self, trained_model_artifacts):
         art = trained_model_artifacts
-        model_auc = roc_auc_score(
-            art["y_test"], art["model"].predict_proba(art["X_test"])[:, 1]
-        )
-        dummy_auc = roc_auc_score(
-            art["y_test"], art["dummy"].predict_proba(art["X_test"])[:, 1]
-        )
-        assert model_auc > dummy_auc, (
-            f"Model AUC {model_auc:.3f} does not beat DummyClassifier {dummy_auc:.3f}"
-        )
+        model_auc = roc_auc_score(art["y_test"], art["model"].predict_proba(art["X_test"])[:, 1])
+        dummy_auc = roc_auc_score(art["y_test"], art["dummy"].predict_proba(art["X_test"])[:, 1])
+        assert (
+            model_auc > dummy_auc
+        ), f"Model AUC {model_auc:.3f} does not beat DummyClassifier {dummy_auc:.3f}"
 
     def test_beats_dummy_classifier_f1(self, trained_model_artifacts):
         art = trained_model_artifacts
         model_f1 = f1_score(art["y_test"], art["model"].predict(art["X_test"]))
-        dummy_f1 = f1_score(
-            art["y_test"], art["dummy"].predict(art["X_test"]), zero_division=0
-        )
-        assert model_f1 > dummy_f1, (
-            f"Model F1 {model_f1:.3f} does not beat DummyClassifier {dummy_f1:.3f}"
-        )
+        dummy_f1 = f1_score(art["y_test"], art["dummy"].predict(art["X_test"]), zero_division=0)
+        assert (
+            model_f1 > dummy_f1
+        ), f"Model F1 {model_f1:.3f} does not beat DummyClassifier {dummy_f1:.3f}"
 
     def test_predict_proba_in_range(self, trained_model_artifacts):
         """All probabilities must be in [0, 1] (slide 17 L2 check)."""
