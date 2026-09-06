@@ -17,7 +17,7 @@
 #   PROD_HOST              production server hostname
 #   PROD_SSH_KEY           private SSH key for production
 #   MLFLOW_TRACKING_URI    MLflow server URL
-#   SLACK_WEBHOOK          Slack incoming webhook URL
+#   DISCORD_WEBHOOK        Discord channel webhook URL
 
 name: Telco Churn ML Pipeline
 
@@ -269,14 +269,21 @@ jobs:
             sleep 20
             curl -f http://localhost:8000/health || exit 1
 
-      - name: Post deployment Slack notification
+      - name: Post deployment Discord notification
         if: always()
-        uses: slackapi/slack-github-action@v4
-        with:
-          payload: |
-            {
-              "text": "${{ job.status == 'success' && '✅' || '❌' }} Production deploy ${{ job.status }}: `sha-${{ github.sha }}`\nActor: ${{ github.actor }}\nBranch: ${{ github.ref_name }}"
-            }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK secret not set — skipping notification"
+            exit 0
+          fi
+          if [ "${{ job.status }}" = "success" ]; then
+            MSG="✅ Production deploy success | sha-${{ github.sha }} | ${{ github.actor }} | ${{ github.ref_name }}"
+          else
+            MSG="❌ Production deploy failure | sha-${{ github.sha }} | ${{ github.actor }} | ${{ github.ref_name }}"
+          fi
+          curl -sf -H "Content-Type: application/json" \
+            -d "{\"content\": \"$MSG\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "$DISCORD_WEBHOOK"
+          echo "Discord notification sent"
