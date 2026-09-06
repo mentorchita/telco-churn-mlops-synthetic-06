@@ -101,6 +101,10 @@ jobs:
     runs-on: ubuntu-latest
     # Only build on pushes, not on PRs (saves build minutes)
     if: github.event_name != 'pull_request'
+    # Grant GITHUB_TOKEN permission to push packages to GHCR
+    permissions:
+      contents: read
+      packages: write
 
     outputs:
       image-tag: ${{ steps.meta.outputs.tags }}
@@ -114,7 +118,8 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          # GITHUB_TOKEN is always available — no manual PAT needed for GHCR
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Docker metadata generates tags automatically (slide 14)
       - name: Extract Docker metadata
@@ -156,7 +161,7 @@ jobs:
           username: deploy
           key:      ${{ secrets.STAGING_SSH_KEY }}
           script: |
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
             docker stop churn-api || true
             docker rm   churn-api || true
@@ -232,7 +237,7 @@ jobs:
           username: deploy
           key:      ${{ secrets.PROD_SSH_KEY }}
           script: |
-            echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
             docker stop churn-api || true
             docker rm   churn-api || true
