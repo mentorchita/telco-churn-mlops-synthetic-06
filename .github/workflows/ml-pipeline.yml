@@ -235,7 +235,7 @@ jobs:
 
 
   # ── JOB 5: Deploy to Production (verify on GitHub runner) ────────────────
-  # No external PROD_HOST required: pull image, start, health-check, stop.
+ # No external PROD_HOST required: pull image, start, health-check, stop.
   # When you have a real prod server, swap this for SSH deploy again.
   deploy-production:
     name: "Deploy to Production (verify on runner)"
@@ -284,6 +284,7 @@ jobs:
           docker logs churn-api-prod || true
           docker rm -f churn-api-prod || true
           exit 1
+
 
       - name: Post deployment Discord notification
         if: always()
