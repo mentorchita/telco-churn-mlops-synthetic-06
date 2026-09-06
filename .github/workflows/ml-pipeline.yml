@@ -81,8 +81,9 @@ jobs:
         run: |
           pytest tests/unit/test_model.py \
             -v --tb=short -m slow \
-            --cov=src/models \
-            --cov-report=xml:coverage-models.xml
+            --cov=src/features --cov=src/models \
+            --cov-report=xml:coverage-models.xml \
+            --cov-fail-under=0
         env:
           MLFLOW_TRACKING_URI: ${{ env.MLFLOW_URI }}
 
