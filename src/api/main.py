@@ -135,7 +135,7 @@ class PredictionResponse(BaseModel):
 
 
 class BatchRequest(BaseModel):
-    customers: List[CustomerInput] = Field(..., max_length=200)
+    customers: List[CustomerInput] = Field(..., max_items=200)
 
 
 class HealthResponse(BaseModel):

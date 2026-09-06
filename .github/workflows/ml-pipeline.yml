@@ -128,12 +128,9 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=sha,prefix=sha-                    
-            # git SHA — ALWAYS (source of truth)
-            type=ref,event=branch                   
-            # branch name — ALWAYS
-            type=semver,pattern={{version}}          
-            # semver tag on release
+            type=sha,prefix=sha-,format=long
+            type=ref,event=branch
+            type=semver,pattern={{version}}
 
       # BuildKit with layer caching (slide 24: saves 7-10 min)
       - name: Set up Docker Buildx
@@ -155,8 +152,10 @@ jobs:
     name: "Integration Tests (L1-L3)"
     needs: build-and-push
     runs-on: ubuntu-latest
-    # Only after image is built (same as before: skip on pure PRs if build skipped)
     if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - uses: actions/checkout@v7
@@ -170,23 +169,36 @@ jobs:
 
       - name: Run API container on runner
         run: |
-          docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
+          set -eux
+          IMAGE_TAG="${{ env.IMAGE }}:sha-${{ github.sha }}"
+          echo "Pulling $IMAGE_TAG"
+          docker pull "$IMAGE_TAG"
           docker rm -f churn-api 2>/dev/null || true
           docker run -d \
             --name churn-api \
             -p 8000:8000 \
-            -e MODEL_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
-            -e MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
-            ${{ env.IMAGE }}:sha-${{ github.sha }}
-          # Wait for health (slide 15: cold start < 30 s)
-          for i in $(seq 1 30); do
+            -e MODEL_URI="${{ secrets.MLFLOW_TRACKING_URI }}" \
+            -e MLFLOW_TRACKING_URI="${{ secrets.MLFLOW_TRACKING_URI }}" \
+            "$IMAGE_TAG"
+          # Wait for health (cold start can take a bit with uvicorn workers)
+          for i in $(seq 1 45); do
             if curl -sf http://127.0.0.1:8000/health; then
               echo "API is healthy"
+              curl -s http://127.0.0.1:8000/health || true
               exit 0
+            fi
+            echo "waiting... ($i)"
+            # show logs early if container already exited
+            if [ "$(docker inspect -f '{{.State.Running}}' churn-api 2>/dev/null || echo false)" != "true" ]; then
+              echo "Container is not running"
+              docker ps -a | head -20 || true
+              docker logs churn-api || true
+              exit 1
             fi
             sleep 2
           done
           echo "API failed to become healthy"
+          docker ps -a | head -20 || true
           docker logs churn-api || true
           exit 1
 
