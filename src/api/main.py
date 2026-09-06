@@ -86,9 +86,7 @@ def load_model() -> None:
         _model_version = os.getenv("MODEL_VERSION", "local-fallback")
         _model_loaded = True
         _load_time_s = round(time.time() - t0, 2)
-        logger.info(
-            "Local model loaded in %.2f s  version=%s", _load_time_s, _model_version
-        )
+        logger.info("Local model loaded in %.2f s  version=%s", _load_time_s, _model_version)
     except Exception as exc:
         logger.error("Failed to load any model: %s", exc)
         _model_loaded = False
