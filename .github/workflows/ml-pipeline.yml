@@ -128,9 +128,12 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           tags: |
-            type=sha,prefix=sha-                    # git SHA — ALWAYS (source of truth)
-            type=ref,event=branch                   # branch name — ALWAYS
-            type=semver,pattern={{version}}          # semver tag on release
+            type=sha,prefix=sha-                    
+            # git SHA — ALWAYS (source of truth)
+            type=ref,event=branch                   
+            # branch name — ALWAYS
+            type=semver,pattern={{version}}          
+            # semver tag on release
 
       # BuildKit with layer caching (slide 24: saves 7-10 min)
       - name: Set up Docker Buildx
