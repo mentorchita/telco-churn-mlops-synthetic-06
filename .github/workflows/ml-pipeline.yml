@@ -149,48 +149,49 @@ jobs:
           cache-from: type=gha
           cache-to:   type=gha,mode=max
 
-  # ── JOB 3: Deploy to Staging ──────────────────────────────────────────────
-  deploy-staging:
-    name: "Deploy to Staging"
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    environment: staging          # isolated secrets for staging (slide 23)
-
-    steps:
-      - name: Deploy image to staging via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host:     ${{ secrets.STAGING_HOST }}
-          username: deploy
-          key:      ${{ secrets.STAGING_SSH_KEY }}
-          script: |
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
-            docker stop churn-api || true
-            docker rm   churn-api || true
-            docker run -d \
-              --name churn-api \
-              --restart unless-stopped \
-              -p 8000:8000 \
-              -e MODEL_URI=${{ secrets.MLFLOW_URI }} \
-              -e MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
-              ${{ env.IMAGE }}:sha-${{ github.sha }}
-            # Wait for container health (slide 15: cold start < 30 s)
-            sleep 20
-            curl -f http://localhost:8000/health || exit 1
-
-  # ── JOB 4: Integration Tests ─────────────────────────────────────────────
+  # ── JOB 3+4: Run API on GitHub runner + Integration Tests ─────────────────
+  # No external staging server required — Docker runs on ubuntu-latest.
   integration-tests:
     name: "Integration Tests (L1-L3)"
-    needs: deploy-staging
+    needs: build-and-push
     runs-on: ubuntu-latest
-    environment: staging
+    # Only after image is built (same as before: skip on pure PRs if build skipped)
+    if: github.event_name != 'pull_request'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run API container on runner
+        run: |
+          docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
+          docker rm -f churn-api 2>/dev/null || true
+          docker run -d \
+            --name churn-api \
+            -p 8000:8000 \
+            -e MODEL_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
+            -e MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          # Wait for health (slide 15: cold start < 30 s)
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/health; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to become healthy"
+          docker logs churn-api || true
+          exit 1
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
@@ -198,27 +199,29 @@ jobs:
       - name: Install test dependencies
         run: pip install -r requirements-dev.txt
 
-      # Smoke test first (slide 15: 30-second check)
       - name: Smoke test
-        run: |
-          pytest tests/smoke/ -v --tb=short
+        run: pytest tests/smoke/ -v --tb=short
         env:
-          API_URL: http://${{ secrets.STAGING_HOST }}:8000
+          API_URL: http://127.0.0.1:8000
 
-      # Full integration tests (slide 17: L1-L3)
       - name: Integration tests
         run: |
           pytest tests/integration/ -v --tb=short \
             --junitxml=test-results/integration.xml
         env:
-          API_URL: http://${{ secrets.STAGING_HOST }}:8000
+          API_URL: http://127.0.0.1:8000
 
       - name: Upload integration test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: integration-test-results
           path: test-results/
+
+      - name: Stop API container
+        if: always()
+        run: docker rm -f churn-api 2>/dev/null || true
+
 
   # ── JOB 5: Deploy to Production ──────────────────────────────────────────
   deploy-production:
