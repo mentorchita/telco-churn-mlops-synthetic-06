@@ -14,8 +14,7 @@
 #   GHCR_TOKEN             GitHub PAT with write:packages scope
 #   STAGING_HOST           staging server hostname or IP
 #   STAGING_SSH_KEY        private SSH key for staging server
-#   PROD_HOST              production server hostname
-#   PROD_SSH_KEY           private SSH key for production
+#   PROD_HOST / PROD_SSH_KEY  (optional — only if you switch back to SSH deploy)
 #   MLFLOW_TRACKING_URI    MLflow server URL
 #   DISCORD_WEBHOOK        Discord channel webhook URL
 
@@ -235,39 +234,56 @@ jobs:
         run: docker rm -f churn-api 2>/dev/null || true
 
 
-  # ── JOB 5: Deploy to Production ──────────────────────────────────────────
+  # ── JOB 5: Deploy to Production (verify on GitHub runner) ────────────────
+  # No external PROD_HOST required: pull image, start, health-check, stop.
+  # When you have a real prod server, swap this for SSH deploy again.
   deploy-production:
-    name: "Deploy to Production (manual gate)"
+    name: "Deploy to Production (verify on runner)"
     needs: integration-tests
     runs-on: ubuntu-latest
-    # Production environment requires reviewer approval (slide 18 / slide 23)
-    environment:
-      name: production
-      url: https://churn-api.example.com
-    # Only deploy to production from main branch, not develop
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: read
 
     steps:
-      - name: Deploy to production via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          host:     ${{ secrets.PROD_HOST }}
-          username: deploy
-          key:      ${{ secrets.PROD_SSH_KEY }}
-          script: |
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.IMAGE }}:sha-${{ github.sha }}
-            docker stop churn-api || true
-            docker rm   churn-api || true
-            docker run -d \
-              --name churn-api \
-              --restart unless-stopped \
-              -p 8000:8000 \
-              -e MODEL_URI=${{ secrets.MLFLOW_URI }} \
-              -e MLFLOW_TRACKING_URI=${{ secrets.MLFLOW_TRACKING_URI }} \
-              ${{ env.IMAGE }}:sha-${{ github.sha }}
-            sleep 20
-            curl -f http://localhost:8000/health || exit 1
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull, start, health-check, stop
+        run: |
+          set -eux
+          IMAGE_TAG="${{ env.IMAGE }}:sha-${{ github.sha }}"
+          echo "Deploy verify: $IMAGE_TAG"
+          docker pull "$IMAGE_TAG"
+          docker rm -f churn-api-prod 2>/dev/null || true
+          docker run -d --name churn-api-prod -p 8000:8000 \
+            -e MODEL_PATH=/app/models/churn_model.joblib \
+            "$IMAGE_TAG"
+
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/health; then
+              echo ""
+              echo "Production image is healthy"
+              curl -s http://127.0.0.1:8000/health || true
+              docker rm -f churn-api-prod
+              exit 0
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' churn-api-prod 2>/dev/null || echo false)" != "true" ]; then
+              echo "Container exited early"
+              docker logs churn-api-prod || true
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "Health check timed out"
+          docker logs churn-api-prod || true
+          docker rm -f churn-api-prod || true
+          exit 1
 
       - name: Post deployment Discord notification
         if: always()
@@ -287,3 +303,4 @@ jobs:
             -d "{\"content\": \"$MSG\\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
             "$DISCORD_WEBHOOK"
           echo "Discord notification sent"
+
