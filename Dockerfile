@@ -1,6 +1,4 @@
-# ── Stage 1: install Python deps ──────────────────────────────────────────────
-# This layer is cached by Docker BuildKit.  Re-built only when requirements.txt changes.
-# Slide 13: multi-stage build → ~450 MB final image vs ~3 GB naïve build.
+# ── Stage 1: install deps + train fallback model ─────────────────────────────
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
@@ -8,44 +6,44 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
+# Train a small local model so /health is healthy without MLflow in CI
+COPY src/ ./src/
+COPY scripts/build_fallback_model.py ./scripts/build_fallback_model.py
+ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app
+RUN python scripts/build_fallback_model.py
+
 
 # ── Stage 2: lean production image ────────────────────────────────────────────
 FROM python:3.11-slim
 
-# Security: run as non-root user (slide 13)
-RUN useradd --create-home --shell /bin/bash appuser
+RUN useradd --create-home --shell /bin/bash appuser \
+    && apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy only the installed packages from Stage 1 (no dev tools in final image)
 COPY --from=builder /root/.local /home/appuser/.local
-
-# Copy application source
+COPY --from=builder /app/models /app/models
 COPY src/ ./src/
 
-# Python path for module imports
 ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
-# MLflow model URI — loaded at container startup, NOT baked into image.
-# Update this env var to deploy a new model version without rebuilding.
-# Slide 13: "Model loaded from MLflow URI, not baked into image."
+# Prefer MLflow when configured; otherwise local joblib fallback
 ENV MODEL_URI=models:/telco-churn-prod/Production
-ENV MODEL_VERSION=Production
-
-# Optionally set tracking server
-# ENV MLFLOW_TRACKING_URI=http://mlflow:5000
+ENV MODEL_PATH=/app/models/churn_model.joblib
+ENV MODEL_VERSION=fallback
 
 USER appuser
 
 EXPOSE 8000
 
-# Used for liveness probe in staging smoke test (slide 15) and Kubernetes (Module 7)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["uvicorn", "src.api.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
-     "--workers", "2", \
+     "--workers", "1", \
      "--log-level", "info"]

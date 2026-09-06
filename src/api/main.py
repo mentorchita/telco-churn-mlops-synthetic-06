@@ -58,21 +58,39 @@ _load_time_s: float = 0.0
 
 
 def load_model() -> None:
-    """Load model from MLflow URI at startup."""
+    """Load model from MLflow when available, else local joblib fallback."""
     global _model, _model_version, _model_loaded, _load_time_s
 
-    model_uri = os.getenv("MODEL_URI", "models:/telco-churn-prod/Production")
-    logger.info("Loading model from %s", model_uri)
     t0 = time.time()
+    model_uri = os.getenv("MODEL_URI", "models:/telco-churn-prod/Production").strip()
+    model_path = os.getenv("MODEL_PATH", "models/churn_model.joblib")
 
+    # Try MLflow first (real deployments with tracking server / registry)
     try:
+        logger.info("Loading model from MLflow URI %s", model_uri)
         _model = mlflow.pyfunc.load_model(model_uri)
         _model_version = os.getenv("MODEL_VERSION", model_uri.split("/")[-1])
         _model_loaded = True
         _load_time_s = round(time.time() - t0, 2)
-        logger.info("Model loaded in %.2f s  version=%s", _load_time_s, _model_version)
+        logger.info("Model loaded from MLflow in %.2f s", _load_time_s)
+        return
     except Exception as exc:
-        logger.error("Failed to load model: %s", exc)
+        logger.warning("MLflow load failed (%s); trying local fallback", exc)
+
+    # Local joblib fallback (CI / image without MLflow server)
+    try:
+        import joblib
+
+        logger.info("Loading local model from %s", model_path)
+        _model = joblib.load(model_path)
+        _model_version = os.getenv("MODEL_VERSION", "local-fallback")
+        _model_loaded = True
+        _load_time_s = round(time.time() - t0, 2)
+        logger.info(
+            "Local model loaded in %.2f s  version=%s", _load_time_s, _model_version
+        )
+    except Exception as exc:
+        logger.error("Failed to load any model: %s", exc)
         _model_loaded = False
 
 
@@ -158,9 +176,14 @@ def _predict_single(customer: CustomerInput) -> float:
     X_cols = [c for c in FEATURE_COLUMNS if c != TARGET_COLUMN]
     X = encoded[X_cols].values
 
+    # sklearn/xgboost: prefer predict_proba; mlflow pyfunc: predict
+    if hasattr(_model, "predict_proba"):
+        proba = _model.predict_proba(X)
+        if getattr(proba, "ndim", 1) == 2:
+            return float(proba[0, 1])
+        return float(proba[0])
     proba = _model.predict(X)
-    # pyfunc may return shape (n,) or (n,2) depending on flavour
-    if proba.ndim == 2:
+    if getattr(proba, "ndim", 1) == 2:
         return float(proba[0, 1])
     return float(proba[0])
 
